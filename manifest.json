@@ -7,7 +7,7 @@
     },
     "background": {
         "scripts": [
-            "background.js"
+            "background.js", "moment.js"
         ]
     },
     "permissions": [

@@ -1,0 +1,14 @@
+{
+    "url": "url",
+    "favIcon": "fac",
+    "title": "tiutle",
+    "timeArray" : [
+        {
+            "TrackedTime" : {
+                "entryTime" : "12-12",
+                "exitTime" : "12-32",
+                "duration" : "20"
+            }
+        }
+    ]
+}
