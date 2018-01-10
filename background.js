@@ -1,8 +1,8 @@
 class Website{
-    constructor(iconUrl, title, url, entryTime, exitTime){
-        this.iconUrl = iconUrl,
-        this.title = title,
+    constructor(url, title, iconUrl, entryTime, exitTime){
         this.url = url,
+        this.title = title,
+        this.iconUrl = iconUrl,
         this.timeArray = new Array(new TimeSpend(entryTime, exitTime))
     }
 }
@@ -12,13 +12,18 @@ class TimeSpend{
         this.entryTime = entryTime,
         this.exitTime = exitTime
     }
-    get duration(){
-        this.calcDuration();
+
+    get duration() {
+        return this.calcDuration();
     }
 
-    //change to function
     calcDuration(){
-        return moment(this.exitTime).substract(this.entryTime);
+        var entry = moment(this.entryTime, "HH:mm:ss");
+        var exit = moment(this.exitTime, "HH:mm:ss");
+
+        var result = exit.diff(entry);
+
+        return moment(result).utcOffset(0).format('HH:mm:ss');
     }
 }
 
@@ -33,7 +38,7 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab){
         return;
 
     console.log(`Tab has been updated`);
-    //console.log(tab);
+    console.log(tab);
     tabChangedOrUpdated(tab);
 });
 
@@ -47,7 +52,7 @@ chrome.tabs.onActivated.addListener(function(activeInfo){
 function getCurrentSelectedTab(tabId){
     chrome.tabs.get(tabId, function(tab) {
         console.log(`selected tab has changed`);
-        //console.log(tab);
+        console.log(tab);
         tabChangedOrUpdated(tab);
     });
 }
@@ -71,30 +76,28 @@ function tabChangedOrUpdated(tab){
     }
 
     if(currentWebsite == null){
-        currentWebsite = new Website(tab.favIconUrl, tab.title, parsedUrl, moment().format('LTS'), null);
+        currentWebsite = new Website(parsedUrl, tab.title, tab.favIconUrl, getCurrentTime(), null);
         return;
     }
     else if(currentWebsite.url === parsedUrl){
         return;
     }
 
-    currentWebsite.timeArray[0].exitTime = moment().format('LTS');
+    currentWebsite.timeArray[0].exitTime = getCurrentTime();
     console.log("Byłem na poniższej stronie");
     console.log(currentWebsite);
 
-    //tu nie działa dodawanie nowych stron
+    
     if(uniqueUrls.indexOf(currentWebsite.url) === -1){
-        uniqueUrls.push(parsedUrl);    
+        uniqueUrls.push(currentWebsite.url);    
         websites.push(currentWebsite);
     }else{
         addTimeToExisingWebsite(tab);
     }
 
-    currentWebsite = new Website(tab.favIconUrl, tab.title, parsedUrl, moment().format('LTS'), null);
+    currentWebsite = new Website(parsedUrl, tab.title, tab.favIconUrl, getCurrentTime(), null);
 }
 
-
-//to be continued...
 function addTimeToExisingWebsite(){
     let index = websites.findIndex(element => element.url == currentWebsite.url);
     
@@ -103,6 +106,11 @@ function addTimeToExisingWebsite(){
         return;
     }
 
-    var timeTracked = new TimeSpend(currentWebsite.entryTime, currentWebsite.exitTime);
+    var timeTracked = new TimeSpend(currentWebsite.timeArray[0].entryTime, currentWebsite.timeArray[0].exitTime);
     websites[index].timeArray.push(timeTracked);
 }
+
+function getCurrentTime(){
+    return moment().format("HH:mm:ss");
+}
+
