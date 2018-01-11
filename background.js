@@ -5,6 +5,17 @@ class Website{
         this.iconUrl = iconUrl,
         this.timeArray = new Array(new TimeSpend(entryTime, exitTime))
     }
+
+    calcTimeSpend(){
+        var result = 0;
+        for(var i = 0; i < this.timeArray.length; i++){
+            result += this.timeArray[i].duration;
+        }
+
+        return result;               
+    }
+
+    //function to get proper site title
 }
 
 class TimeSpend{
@@ -21,9 +32,7 @@ class TimeSpend{
         var entry = moment(this.entryTime, "HH:mm:ss");
         var exit = moment(this.exitTime, "HH:mm:ss");
 
-        var result = exit.diff(entry);
-
-        return moment(result).utcOffset(0).format('HH:mm:ss');
+        return exit.diff(entry);
     }
 }
 
@@ -65,17 +74,15 @@ function urlParser(url){
     return element.hostname;
 }
 
-//--add website or time to website
+//--add new website or time to website to website array
 function tabChangedOrUpdated(tab){
     let parsedUrl = urlParser(tab.url);
-    
-    //scenariusz ze strony np. do historii, nowej karty itd.
-    if(!urlRegex.test(parsedUrl)){
-        console.log(`urlError: ${parsedUrl}`);
+    var isBadUrl = !urlRegex.test(parsedUrl);
+
+    if(isBadUrl && currentWebsite == null){
         return;
     }
-
-    if(currentWebsite == null){
+    else if(currentWebsite == null){
         currentWebsite = new Website(parsedUrl, tab.title, tab.favIconUrl, getCurrentTime(), null);
         return;
     }
@@ -84,18 +91,19 @@ function tabChangedOrUpdated(tab){
     }
 
     currentWebsite.timeArray[0].exitTime = getCurrentTime();
-    console.log("Byłem na poniższej stronie");
-    console.log(currentWebsite);
-
     
     if(uniqueUrls.indexOf(currentWebsite.url) === -1){
         uniqueUrls.push(currentWebsite.url);    
         websites.push(currentWebsite);
     }else{
-        addTimeToExisingWebsite(tab);
+        addTimeToExisingWebsite();
     }
 
-    currentWebsite = new Website(parsedUrl, tab.title, tab.favIconUrl, getCurrentTime(), null);
+    if(isBadUrl){
+        currentWebsite = null;    
+    }else{
+        currentWebsite = new Website(parsedUrl, tab.title, tab.favIconUrl, getCurrentTime(), null);
+    }
 }
 
 function addTimeToExisingWebsite(){
@@ -110,7 +118,11 @@ function addTimeToExisingWebsite(){
     websites[index].timeArray.push(timeTracked);
 }
 
+//-- additional MomentJS functions
 function getCurrentTime(){
     return moment().format("HH:mm:ss");
 }
 
+function parseToHHmmss(value){
+    return moment(value).utcOffset(0).format("HH:mm:ss");
+}
