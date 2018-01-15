@@ -126,3 +126,29 @@ function getCurrentTime(){
 function parseToHHmmss(value){
     return moment(value).utcOffset(0).format("HH:mm:ss");
 }
+
+//--saving data
+//https://developer.chrome.com/extensions/storage
+//http://julip.co/2010/01/how-to-build-a-chrome-extension-part-2-options-and-localstorage/
+
+
+//--Checking functions
+function logTimeForWebsite(index){
+    var result = websites[index].calcTimeSpend();
+    return parseToHHmmss(result);
+}
+
+function logTimeForAllWebsites(){
+    var arr = [];
+    for(var i = 0; i < websites.length; i++){
+        var timeS = logTimeForAllWebsites(i);
+
+        var obj = {
+            url: websites[i].url,
+            time: timeS
+        };
+
+        arr.push(obj);
+    }
+    console.log(arr);
+}
