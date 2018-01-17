@@ -6,13 +6,13 @@ class Website{
         this.timeArray = new Array(new TimeSpend(entryTime, exitTime))
     }
 
-    calcTimeSpend(){
+    calcTimeDuration(format){
         var result = 0;
         for(var i = 0; i < this.timeArray.length; i++){
             result += this.timeArray[i].duration;
         }
 
-        return result;               
+        return format ? moment(result).utcOffset(0).format("HH:mm:ss") : result;            
     }
 
     //function to get proper site title
@@ -21,18 +21,16 @@ class Website{
 class TimeSpend{
     constructor(entryTime, exitTime){
         this.entryTime = entryTime,
-        this.exitTime = exitTime
+        this.exitTime = exitTime,
+        this.duration = this.calcDuration(false)
     }
 
-    get duration() {
-        return this.calcDuration();
-    }
-
-    calcDuration(){
+    calcDuration(format){
         var entry = moment(this.entryTime, "HH:mm:ss");
         var exit = moment(this.exitTime, "HH:mm:ss");
+        var result = exit.diff(entry);
 
-        return exit.diff(entry);
+        return format ? moment(result).utcOffset(0).format("HH:mm:ss") : result;
     }
 }
 
@@ -130,6 +128,8 @@ function parseToHHmmss(value){
 //--saving data
 //https://developer.chrome.com/extensions/storage
 //http://julip.co/2010/01/how-to-build-a-chrome-extension-part-2-options-and-localstorage/
+
+
 
 
 //--Checking functions

@@ -1,20 +1,16 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
-  "manifest_version": 2,
-  "browser_action": {
-    "default_popup": "index.html",
-    "default_title": "React Ext"
-  },
-  "version": "1.0",
-  "background": {
-    "scripts": [
-      "background.js",
-      "moment.js"
+    "manifest_version": 2,
+    "name": "WebTime",
+    "version": "1.0",
+    "browser_action": {
+        "default_popup": "popup.html"
+    },
+    "background": {
+        "scripts": [
+            "background.js", "moment.js"
+        ]
+    },
+    "permissions": [
+        "tabs", "topSites", "storage"
     ]
-  },
-  "permissions": [
-    "tabs",
-    "topSites"
-  ]
 }
