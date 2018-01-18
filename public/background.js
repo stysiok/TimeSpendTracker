@@ -1,7 +1,6 @@
 class Website{
-    constructor(url, title, iconUrl, entryTime, exitTime){
+    constructor(url, iconUrl, entryTime, exitTime){
         this.url = url,
-        this.title = title,
         this.iconUrl = iconUrl,
         this.timeArray = new Array(new TimeSpend(entryTime, exitTime))
     }
@@ -14,23 +13,23 @@ class Website{
 
         return format ? moment(result).utcOffset(0).format("HH:mm:ss") : result;            
     }
-
-    //function to get proper site title
 }
 
 class TimeSpend{
     constructor(entryTime, exitTime){
         this.entryTime = entryTime,
-        this.exitTime = exitTime,
-        this.duration = this.calcDuration(false)
+        this.exitTime = exitTime
+    }
+
+    get duration(){
+        return this.calcDuration();
     }
 
     calcDuration(format){
         var entry = moment(this.entryTime, "HH:mm:ss");
         var exit = moment(this.exitTime, "HH:mm:ss");
-        var result = exit.diff(entry);
-
-        return format ? moment(result).utcOffset(0).format("HH:mm:ss") : result;
+        
+        return exit.diff(entry);
     }
 }
 
@@ -74,14 +73,14 @@ function urlParser(url){
 
 //--add new website or time to website to website array
 function tabChangedOrUpdated(tab){
-    let parsedUrl = urlParser(tab.url);
+    var parsedUrl = urlParser(tab.url);
     var isBadUrl = !urlRegex.test(parsedUrl);
 
     if(isBadUrl && currentWebsite == null){
         return;
     }
     else if(currentWebsite == null){
-        currentWebsite = new Website(parsedUrl, tab.title, tab.favIconUrl, getCurrentTime(), null);
+        currentWebsite = new Website(parsedUrl, tab.favIconUrl, getCurrentTime(), null);
         return;
     }
     else if(currentWebsite.url === parsedUrl){
@@ -100,12 +99,12 @@ function tabChangedOrUpdated(tab){
     if(isBadUrl){
         currentWebsite = null;    
     }else{
-        currentWebsite = new Website(parsedUrl, tab.title, tab.favIconUrl, getCurrentTime(), null);
+        currentWebsite = new Website(parsedUrl, tab.favIconUrl, getCurrentTime(), null);
     }
 }
 
 function addTimeToExisingWebsite(){
-    let index = websites.findIndex(element => element.url == currentWebsite.url);
+    var index = websites.findIndex(element => element.url == currentWebsite.url);
     
     if(index === -1){
         console.log("coś poszło nie tak przy sprawdzaniu czy strona istnieje w bazie");
@@ -116,6 +115,57 @@ function addTimeToExisingWebsite(){
     websites[index].timeArray.push(timeTracked);
 }
 
+//--saving data
+//https://developer.chrome.com/extensions/storage
+//http://julip.co/2010/01/how-to-build-a-chrome-extension-part-2-options-and-localstorage/
+chrome.windows.onRemoved.addListener(function(windowId){
+    chrome.windows.getAll(function(windows){
+        if(windows.length != 0)
+            return;
+        
+       saveDataToStorage();
+    })
+})
+
+function saveDataToStorage(){
+    //getDataFromStorage
+    //function to get keys for period of time
+    var key = moment().format("DD-MM-YYYY");
+
+    chrome.storage.sync.get(key, function(items){
+        for(var i = 0; i < items.length; i++){
+            var index = websites.findIndex(element => element.url == items[i].url);
+
+            if(index !== -1){
+                var times = items[i].timeArray;
+                for(var j = 0; j < times.length; j++){
+                    //needs to be sorted bcs time will be ealier than current time
+                    websites[index].timeArray.push(new TimeSpend(times[j].entryTime, times[j].exitTime));
+                }
+
+                items.splice(i, 1);
+            }
+        }
+        
+        if(items.length != 0){
+            //map rest of the data from storage to Website's objects
+        }
+    });
+    //map
+    //saveDataToStorage
+}
+
+var mapItemsToWebsites = (items) => {
+    var mapedWebsites = [];
+    for(var i = 0; i < items.length; i++){
+        var website = new Website();
+
+        mappedWebsites.push(website);
+    }
+
+    return mapedWebsites;
+}
+
 //-- additional MomentJS functions
 function getCurrentTime(){
     return moment().format("HH:mm:ss");
@@ -124,13 +174,6 @@ function getCurrentTime(){
 function parseToHHmmss(value){
     return moment(value).utcOffset(0).format("HH:mm:ss");
 }
-
-//--saving data
-//https://developer.chrome.com/extensions/storage
-//http://julip.co/2010/01/how-to-build-a-chrome-extension-part-2-options-and-localstorage/
-
-
-
 
 //--Checking functions
 function logTimeForWebsite(index){
