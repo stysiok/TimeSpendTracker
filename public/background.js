@@ -1,6 +1,6 @@
 class Website {
     constructor(url, iconUrl, entryTime, exitTime) {
-        this.url = url,
+            this.url = url,
             this.iconUrl = iconUrl,
             this.timeArray = new Array(new TimeSpent(entryTime, exitTime))
     }
@@ -60,7 +60,13 @@ chrome.tabs.onActivated.addListener(function (activeInfo) {
 });
 
 function getCurrentSelectedTab(tabId) {
+    if(tabId == null)
+        return;
+
     chrome.tabs.get(tabId, function (tab) {
+        if(tab == null || tab.status !== "complete" || !tab.active)
+            return;
+        
         console.log(`selected tab has changed`);
         console.log(tab);
         tabChangedOrUpdated(tab);
@@ -77,6 +83,9 @@ function urlParser(url) {
 
 //--add new website or time to website to website array
 function tabChangedOrUpdated(tab) {
+    if(tab == null)
+        return;
+    
     var parsedUrl = urlParser(tab.url);
     var isBadUrl = !urlRegex.test(parsedUrl);
 
@@ -91,6 +100,13 @@ function tabChangedOrUpdated(tab) {
         return;
     }
 
+    addWebsiteToWebsites();
+
+
+    currentWebsite = isBadUrl ? null : new Website(parsedUrl, tab.favIconUrl, getCurrentTime(), null);
+}
+
+function addWebsiteToWebsites(){
     currentWebsite.timeArray[0].exitTime = getCurrentTime();
 
     if (uniqueUrls.indexOf(currentWebsite.url) === -1) {
@@ -98,12 +114,6 @@ function tabChangedOrUpdated(tab) {
         websites.push(currentWebsite);
     } else {
         addTimeToExisingWebsite();
-    }
-
-    if (isBadUrl) {
-        currentWebsite = null;
-    } else {
-        currentWebsite = new Website(parsedUrl, tab.favIconUrl, getCurrentTime(), null);
     }
 }
 
@@ -119,17 +129,76 @@ function addTimeToExisingWebsite() {
     websites[index].timeArray.push(timeTracked);
 }
 
-//--saving data
+//--saving and getting data
 //https://developer.chrome.com/extensions/storage
 //http://julip.co/2010/01/how-to-build-a-chrome-extension-part-2-options-and-localstorage/
 chrome.windows.onRemoved.addListener(function (windowId) {
     chrome.windows.getAll(function (windows) {
         if (windows.length != 0)
-            return;
+           return;
 
-        //saveDataToStorage();
+        if(currentWebsite != null)
+            addWebsiteToWebsites();
+        
+        currentWebsite = null;
+        console.log(websites);
+
+        var key = moment().format("DD/MM/YYYY");
+        
+        getDataFromStorage(key);
+
+        //saveDataToStorage(key);
     })
-})
+});
+
+function getDataFromStorage(key) {
+    chrome.storage.sync.get([key], function (items) {
+        if(items == null)
+            return;
+        
+        var toMap = [];
+        console.log(items);
+        var tItems = items[key];
+
+        for (var i = 0; i < tItems.length; i++) {
+            var index = websites.findIndex(element => element.url == tItems[i].url);
+
+            if (index !== -1) {
+                var times = tItems[i].timeArray;
+                for (var j = 0; j < times.length; j++) {
+                    //needs to be sorted bcs time will be ealier than current time
+                    websites[index].timeArray.push(new TimeSpent(times[j].entryTime, times[j].exitTime));
+                }
+
+                websites[index].timeArray.sort((obj1, obj2) => obj1.entryTime > obj2.entryTime);
+            }
+            else {
+                toMap.push(tItems[i]);
+            }
+        }
+
+        if (toMap.length != 0) {
+            websites = websites.concat(mapItemsToWebsites(toMap));
+        }
+
+        console.log(key);
+        saveDataToStorage(key);
+    });
+}
+
+function saveDataToStorage(key) {
+    var obj = {
+        [key]: websites
+    };
+    console.log(obj);
+
+    chrome.storage.sync.set(obj, function () {
+        console.log("Saved data");
+        websites = [];
+        uniqueUrls = [];
+    });
+}
+
 
 //temporary solution - need to think how to implement a better constructor for website class
 var mapItemsToWebsites = (items) => {
@@ -236,51 +305,4 @@ function mapItemsToWebsiteObjectsTest() {
     var mapped = mapItemsToWebsites(objs);
     console.log(objs);
     console.log(mapped);
-}
-
-function getData(key) {
-    chrome.storage.sync.get([key], function (items) {
-        var toMap = [];
-        console.log(items);
-        var tItems = items[key];
-
-        for (var i = 0; i < tItems.length; i++) {
-            var index = websites.findIndex(element => element.url == tItems[i].url);
-
-            if (index !== -1) {
-                var times = tItems[i].timeArray;
-                for (var j = 0; j < times.length; j++) {
-                    //needs to be sorted bcs time will be ealier than current time
-                    websites[index].timeArray.push(new TimeSpent(times[j].entryTime, times[j].exitTime));
-                }
-
-                websites[i].timeArray.sort((obj1, obj2) => obj1.entryTime > obj2.entryTime);
-            }
-            else {
-                toMap.push(tItems[i]);
-            }
-        }
-
-        if (tItems.length != 0) {
-            websites = websites.concat(mapItemsToWebsites(toMap));
-        }
-    });
-    console.log(websites);
-}
-
-function saveDataToStorage(key) {
-    //getDataFromStorage
-    //function to get keys for period of time
-
-    //var saveKey = moment().format("DD-MM-YYYY");
-    var obj = {
-        [key]: websites
-    };
-    console.log(obj);
-
-    chrome.storage.sync.set(obj, function () {
-        console.log("Saved data");
-        websites = [];
-        uniqueUrls = [];
-    });
 }
