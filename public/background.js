@@ -1,39 +1,23 @@
 class Website {
-    constructor(url, iconUrl, entryTime, exitTime) {
-            this.url = url,
+    constructor(url, iconUrl, date, entryTime, exitTime) {
+        this.url = url,
             this.iconUrl = iconUrl,
-            this.timeArray = new Array(new TimeSpent(entryTime, exitTime))
-    }
-
-    get wholeDuration() {
-        return this.calcTimeDuration(false);
-    }
-
-    calcTimeDuration(format) {
-        var result = 0;
-        for (var i = 0; i < this.timeArray.length; i++) {
-            result += this.timeArray[i].duration;
-        }
-
-        return format ? moment(result).utcOffset(0).format("HH:mm:ss") : result;
-    }
-}
-
-class TimeSpent {
-    constructor(entryTime, exitTime) {
-        this.entryTime = entryTime,
+            this.date = date,
+            this.entryTime = entryTime,
             this.exitTime = exitTime
     }
 
     get duration() {
-        return this.calcDuration();
+        return this.calcDuration(true);
     }
 
     calcDuration(format) {
         var entry = moment(this.entryTime, "HH:mm:ss");
         var exit = moment(this.exitTime, "HH:mm:ss");
 
-        return exit.diff(entry);
+        var result = exit.diff(entry);
+
+        return format ? moment(result).utcOffset(0).format("HH:mm:ss") : result;
     }
 }
 
@@ -41,34 +25,52 @@ var uniqueUrls = [];
 var websites = [];
 var currentWebsite;
 var urlRegex = /[a-z0-9-\.]+\.[a-z]{2,4}\/?([^\s<>\#%"\,\{\}\\|\\\^\[\]`]+)?$/;
+var connectionString = "TimeTrackerDB";
+var db;
 
 //--Chrome Extension section
+chrome.windows.onCreated.addListener(function () {
+    openDatabaseConnection();
+});
+
 chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
     if (tab.status !== "complete" || !tab.active || changeInfo.status === undefined)
         return;
 
-    console.log(`Tab has been updated`);
-    console.log(tab);
+    consoleLogHandler("TAB EVENT!!!", "Tab has been updated", tab);
+
     tabChangedOrUpdated(tab);
 });
 
+chrome.tabs.onRemoved.addListener(function (tabId, removeInfo) {      
+    chrome.tabs.query({}, function (result) {
+        if (result.length != 0)
+            return;
+
+        if (currentWebsite == null)
+            return;
+
+        saveData();
+    });
+});
+
 chrome.tabs.onActivated.addListener(function (activeInfo) {
-    if (activeInfo.tabId == "")
+    if (activeInfo.tabId == "" || activeInfo.tabId == undefined)
         return;
 
     getCurrentSelectedTab(activeInfo.tabId);
 });
 
 function getCurrentSelectedTab(tabId) {
-    if(tabId == null)
+    if (tabId == null)
         return;
 
     chrome.tabs.get(tabId, function (tab) {
-        if(tab == null || tab.status !== "complete" || !tab.active)
+        if (tab == undefined || tab.status !== "complete" || !tab.active)
             return;
-        
-        console.log(`selected tab has changed`);
-        console.log(tab);
+
+        consoleLogHandler("TAB EVENT!!!", "Selected tab has been changed", tab);
+
         tabChangedOrUpdated(tab);
     });
 }
@@ -81,124 +83,63 @@ function urlParser(url) {
     return element.hostname;
 }
 
-//--add new website or time to website to website array
+//--add new website to current websites
 function tabChangedOrUpdated(tab) {
-    if(tab == null)
+    if (tab == null)
         return;
-    
+
     var parsedUrl = urlParser(tab.url);
     var isBadUrl = !urlRegex.test(parsedUrl);
 
     if (isBadUrl && currentWebsite == null) {
         return;
-    }
-    else if (currentWebsite == null) {
-        currentWebsite = new Website(parsedUrl, tab.favIconUrl, getCurrentTime(), null);
+    } else if (currentWebsite == null) {
+        currentWebsite = new Website(parsedUrl, tab.favIconUrl, moment().format("DD/MM/YYYY"), getCurrentTime(), null);
         return;
-    }
-    else if (currentWebsite.url === parsedUrl) {
-        return;
-    }
-
-    addWebsiteToWebsites();
-
-
-    currentWebsite = isBadUrl ? null : new Website(parsedUrl, tab.favIconUrl, getCurrentTime(), null);
-}
-
-function addWebsiteToWebsites(){
-    currentWebsite.timeArray[0].exitTime = getCurrentTime();
-
-    if (uniqueUrls.indexOf(currentWebsite.url) === -1) {
-        uniqueUrls.push(currentWebsite.url);
-        websites.push(currentWebsite);
-    } else {
-        addTimeToExisingWebsite();
-    }
-}
-
-function addTimeToExisingWebsite() {
-    var index = websites.findIndex(element => element.url == currentWebsite.url);
-
-    if (index === -1) {
-        console.log("coś poszło nie tak przy sprawdzaniu czy strona istnieje w bazie");
+    } else if (currentWebsite.url === parsedUrl) {
         return;
     }
 
-    var timeTracked = new TimeSpent(currentWebsite.timeArray[0].entryTime, currentWebsite.timeArray[0].exitTime);
-    websites[index].timeArray.push(timeTracked);
+    saveData();
+    uniqueUrls.push(currentWebsite.url);
+    websites.push(currentWebsite);
+
+
+    currentWebsite = isBadUrl ? null : new Website(parsedUrl, tab.favIconUrl, moment().format("DD/MM/YYYY"), getCurrentTime(), null);
 }
 
-//--saving and getting data
-//https://developer.chrome.com/extensions/storage
-//http://julip.co/2010/01/how-to-build-a-chrome-extension-part-2-options-and-localstorage/
-chrome.windows.onRemoved.addListener(function (windowId) {
-    chrome.windows.getAll(function (windows) {
-        if (windows.length != 0)
-           return;
+//--Database
+function openDatabaseConnection() {
+    db = new Dexie(connectionString);
+    db.version(1).stores({
+        websites: '++id, url, iconUrl, date, entryTime, exitTime'
+    });
 
-        if(currentWebsite != null)
-            addWebsiteToWebsites();
-        
-        currentWebsite = null;
-        console.log(websites);
-
-        var key = moment().format("DD/MM/YYYY");
-        
-        getDataFromStorage(key);
-
-        //saveDataToStorage(key);
-    })
-});
-
-function getDataFromStorage(key) {
-    chrome.storage.sync.get([key], function (items) {
-        if(items == null)
-            return;
-        
-        var toMap = [];
-        console.log(items);
-        var tItems = items[key];
-
-        for (var i = 0; i < tItems.length; i++) {
-            var index = websites.findIndex(element => element.url == tItems[i].url);
-
-            if (index !== -1) {
-                var times = tItems[i].timeArray;
-                for (var j = 0; j < times.length; j++) {
-                    //needs to be sorted bcs time will be ealier than current time
-                    websites[index].timeArray.push(new TimeSpent(times[j].entryTime, times[j].exitTime));
-                }
-
-                websites[index].timeArray.sort((obj1, obj2) => obj1.entryTime > obj2.entryTime);
-            }
-            else {
-                toMap.push(tItems[i]);
-            }
-        }
-
-        if (toMap.length != 0) {
-            websites = websites.concat(mapItemsToWebsites(toMap));
-        }
-
-        console.log(key);
-        saveDataToStorage(key);
+    db.open().catch(function (error) {
+        consoleLogHandler("DB ERROR!!!", "Error while creating connection with the database", error);
     });
 }
 
-function saveDataToStorage(key) {
-    var obj = {
-        [key]: websites
-    };
-    console.log(obj);
+function saveData() {
+    openDatabaseConnection();
 
-    chrome.storage.sync.set(obj, function () {
-        console.log("Saved data");
-        websites = [];
-        uniqueUrls = [];
+    currentWebsite.exitTime = getCurrentTime();
+
+    db.websites.add({
+        url: currentWebsite.url,
+        iconUrl: currentWebsite.iconUrl,
+        date: currentWebsite.date,
+        entryTime: currentWebsite.entryTime,
+        exitTime: currentWebsite.exitTime
+    }).then(function (result) {
+        consoleLogHandler("ADD SUCCESSFUL!!!", "Adding data to the database has been successful", result);
+    }).catch(function (error) {
+        console.group("DB ADD ERROR!!!");
+        console.log(`Error while adding data to the database`);
+        console.log(error);
+        console.groupEnd();
     });
 }
-
 
 //temporary solution - need to think how to implement a better constructor for website class
 var mapItemsToWebsites = (items) => {
@@ -207,7 +148,7 @@ var mapItemsToWebsites = (items) => {
         var temp = items[i];
         var website = new Website(temp.url, temp.iconUrl, temp.timeArray[0].entryTime, temp.timeArray[0].exitTime);
 
-        if(temp.timeArray.length > 1){
+        if (temp.timeArray.length > 1) {
             for (var j = 1; j < temp.timeArray.length; j++) {
                 var tempTS = new TimeSpent(temp.timeArray[j].entryTime, temp.timeArray[j].exitTime);
                 website.timeArray.push(tempTS);
@@ -254,8 +195,7 @@ function mapItemsToWebsiteObjectsTest() {
     var obj1 = {
         url: "das",
         iconUrl: "123",
-        timeArray: [
-            {
+        timeArray: [{
                 entryTime: "12:12:12",
                 exitTime: "12:32:12"
 
@@ -270,8 +210,7 @@ function mapItemsToWebsiteObjectsTest() {
     var obj2 = {
         url: "da321s",
         iconUrl: "112312323",
-        timeArray: [
-            {
+        timeArray: [{
                 entryTime: "12:12:12",
                 exitTime: "12:32:12"
 
@@ -286,8 +225,7 @@ function mapItemsToWebsiteObjectsTest() {
     var obj3 = {
         url: "das12",
         iconUrl: "112312312323",
-        timeArray: [
-            {
+        timeArray: [{
                 entryTime: "12:12:12",
                 exitTime: "12:32:12"
 
@@ -305,4 +243,12 @@ function mapItemsToWebsiteObjectsTest() {
     var mapped = mapItemsToWebsites(objs);
     console.log(objs);
     console.log(mapped);
+}
+
+//--console log extension
+function consoleLogHandler(title, message, data) {
+    console.group(title);
+    console.log(message);
+    console.log(data);
+    console.groupEnd();
 }
