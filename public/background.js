@@ -252,3 +252,15 @@ function consoleLogHandler(title, message, data) {
     console.log(data);
     console.groupEnd();
 }
+
+chrome.runtime.onSuspend.addListener(function(){
+    db.websites.add({
+        url: "dao",
+        iconUrl: "das",
+        date: "asdasdasd",
+        entryTime: "12:21:32",
+        exitTime: "12:32:32"
+    }).then(function (result) {
+        consoleLogHandler("ADD SUCCESSFUL!!!", "Adding data to the database has been successful", result);
+    });
+});

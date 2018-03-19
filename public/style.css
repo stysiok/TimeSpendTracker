@@ -1,0 +1,67 @@
+body{
+    padding: 0px;
+    width: 300px;
+    height: 600px;
+    background-color: #2f3640;
+    color: #f5f6fa;
+}
+
+h1{
+    text-align: center;
+    font-size: 28px;
+}
+
+.line-break{
+    height: 3px;
+    background-color: #f5f6fa;
+    margin: 10px 0px;
+}
+
+h2{
+    font-size: 24px;
+}
+
+h3{
+    font-size: 20px;
+}
+
+.placeholder{
+    margin: 5px 0px;
+}
+
+.icon {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+}
+
+.title{
+    padding-bottom: 5px;
+}
+
+.website-box{
+    margin: 20px 0 25px 0;
+}
+
+.icon-sm{
+    width: 45px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.no-padding{
+    padding:0;
+}
+
+#position{
+    font-size: 40px;
+    padding: 0;
+}
+
+.col-sm-11{
+    padding-top: 10px;
+}
+
+#title-progress-box{
+    padding-left: 0px;
+}
